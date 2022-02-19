@@ -18,7 +18,7 @@ from threading import Thread
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s — Line:%(lineno)d — %(message)s",
                     datefmt='%d-%b-%y %H:%M:%S')
-urllib3_cn.allowed_gai_family = lambda: socket.AF_INET  # Uses IPv4 over IPv6
+urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
 
 
 class SQLScreen(QDialog):
@@ -27,6 +27,9 @@ class SQLScreen(QDialog):
         loadUi(resource_path('assets/ui/sql-screen.ui'), self)
         self.password_line_edit.setEchoMode(QtWidgets.QLineEdit.Password)
         self.continue_button.clicked.connect(self.initialise_sql)
+        self.host_line_edit.returnPressed.connect(self.initialise_sql)
+        self.user_line_edit.returnPressed.connect(self.initialise_sql)
+        self.password_line_edit.returnPressed.connect(self.initialise_sql)
 
     def initialise_sql(self):
         host = self.host_line_edit.text()
@@ -66,22 +69,24 @@ class LoginScreen(QDialog):
         super(LoginScreen, self).__init__()
         loadUi(resource_path('assets/ui/login.ui'), self)
         self.password_line_edit.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.username_line_edit.returnPressed.connect(self.login_function)
+        self.password_line_edit.returnPressed.connect(self.login_function)
         self.login_button.clicked.connect(self.login_function)
         self.sign_up_button.clicked.connect(WelcomeScreen.gotocreate)
 
-    def login_function(self):  # Function to help user log in
+    def login_function(self):
         global username
-        username = self.username_line_edit.text()  # Username entered by user
-        password = self.password_line_edit.text()  # Password entered by user
+        username = self.username_line_edit.text()
+        password = self.password_line_edit.text()
         self.error_label.setText('')
         self.error_label_2.setText('')
-        if len(username) == 0 or len(password) == 0:  # checks if all fields have been filled
+        if len(username) == 0 or len(password) == 0:
             self.error_label.setText('Please input all fields')
         else:
             try:
                 userdata = bgfns.login(username)
-                matched_password = userdata[1]  # Searches for username in SQL. If it doesn't exist then it goes to the except statement, if it does exist then matched password will become required password.
-                if matched_password == password and not userdata[2]:  # Verifies if required password (i.e, matched_password) matches with the password entered by user
+                matched_password = userdata[1]
+                if matched_password == password and not userdata[2]:
                     logging.info(f'{username} has successfully logged in.')
                     main_screen = MainScreen()
                     widget.addWidget(main_screen)
@@ -102,23 +107,30 @@ class CreateAccScreen(QDialog):
         self.password_line_edit.setEchoMode(QtWidgets.QLineEdit.Password)
         self.confirm_password_line_edit.setEchoMode(QtWidgets.QLineEdit.Password)
         self.sign_up_button.clicked.connect(self.sign_up_function)
+        self.username_line_edit.returnPressed.connect(self.sign_up_function)
+        self.password_line_edit.returnPressed.connect(self.sign_up_function)
+        self.confirm_password_line_edit.returnPressed.connect(self.sign_up_function)
         self.login_button.clicked.connect(WelcomeScreen.gotologin)
 
-    def sign_up_function(self):  # Function to help users create a new account
+    def sign_up_function(self):
         global username
-        username = self.username_line_edit.text()  # Username entered by user
-        password = self.password_line_edit.text()  # Password entered by user
-        confirm_password = self.confirm_password_line_edit.text()  # Password entered again by user
+        username = self.username_line_edit.text()
+        password = self.password_line_edit.text()
+        confirm_password = self.confirm_password_line_edit.text()
         self.error_label.setText('')
         if len(username) == 0 or len(password) == 0 or len(
-                confirm_password) == 0:  # If all fields haven't been filled throw error
+                confirm_password) == 0:
             self.error_label.setText("Please fill in all fields")
-        elif password != confirm_password:  # If password does not match confirm password, throw error
+        elif password != confirm_password:
             self.error_label.setText("Passwords do not match")
         elif (bgfns.getuser(username)) and (
-                username in bgfns.getuser(username)):  # If username exists throw error
+                username in bgfns.getuser(username)):
             self.error_label.setText("Username is already taken")
-        else:  # Add username-password pair to database
+        elif not 4 < len(username) < 21:
+            self.error_label.setText('Username should be 5 to 20 characters long.')
+        elif not 4 < len(password) < 21:
+            self.error_label.setText('Password should be 5 to 20 characters long.')
+        else:
             bgfns.create_profile(username, password)
             logging.info(f'New user {username} signed up.')
             WelcomeScreen().gotologin()
@@ -132,6 +144,7 @@ class MainScreen(QDialog):
             self.user_management.deleteLater()
             self.admin_shield.deleteLater()
         self.search_button.clicked.connect(self.search_function)
+        self.search_line_edit.returnPressed.connect(self.search_function)
         self.menu_home.clicked.connect(MainScreen.gotomenu)
         self.menu_fav.clicked.connect(lambda: MainScreen.gotouserlists(0))
         self.menu_my_read.clicked.connect(lambda: MainScreen.gotouserlists(1))
@@ -139,7 +152,7 @@ class MainScreen(QDialog):
         self.menu_sign_out.clicked.connect(WelcomeScreen.gotologin)
         self.user_management.clicked.connect(MainScreen.gotousermanagement)
 
-    def search_function(self):  # Home page search function
+    def search_function(self):
         global searchterm
         searchterm = self.search_line_edit.text()
         if len(searchterm):
@@ -151,7 +164,7 @@ class MainScreen(QDialog):
             widget.setCurrentIndex(widget.currentIndex() + 1)
 
     @staticmethod
-    def gotouserlists(num):  # Function to redirect users to My read/Favourites/Read list tab
+    def gotouserlists(num):
         items = []
         QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         user_lists = [bgfns.list_toggle(username, False, '', 'LIKEBOOK'),
@@ -206,10 +219,9 @@ class UserManagement(QDialog):
         super(UserManagement, self).__init__()
         loadUi(resource_path('assets/ui/user-management.ui'), self)
         users_list = bgfns.banlist()
-        users_list.sort(key=lambda x: x[1])  # First unbanned users and then banned
+        users_list.sort(key=lambda x: x[1])
         i = 0
         for user in users_list:
-            # Username label
             self.user = QtWidgets.QLabel(self.bgwidget)
             self.user.setGeometry(QtCore.QRect(270, 530 + (i * 70), 431, 51))
             self.user.setStyleSheet("border-radius: 18px;\n"
@@ -219,7 +231,6 @@ class UserManagement(QDialog):
             self.user.setScaledContents(True)
             self.user.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
             self.user.setObjectName(f"user_{user[0]}")
-            # Ban/Unban button
             self.ban_user = QtWidgets.QPushButton(self.bgwidget)
             self.ban_user.setGeometry(QtCore.QRect(730, 535 + (i * 70), 151, 41))
             self.ban_user.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
@@ -308,29 +319,14 @@ class SearchScreen(QDialog):
             book_id_list = book_id_list + [book_id]
         threads = []
         for j in range(len(thumbnail_list)):
-            # Book thumbnail
             self.label = QtWidgets.QLabel(self.bgwidget)
-            self.label.setGeometry(QtCore.QRect(100 + ((j % 5) * 200), 210 + ((j // 5) * 300), 128, 190))
-            self.label.setText('')
-            t = Thread(target=self.download_thumbnails, args=(j, self.label))
-            threads.append(t)
-            # Book redirect buttons
+            self.label.setObjectName("label_book_" + str(j + 1))
             self.button = QtWidgets.QPushButton(self.bgwidget)
-            self.button.setGeometry(QtCore.QRect(100 + ((j % 5) * 200), 210 + ((j // 5) * 300), 128, 190))
-            self.button.setStyleSheet("background-color: rgba(0, 0, 0, 0);")
-            self.button.setText("")
             self.button.setObjectName("button_book_" + str(j + 1))
-            self.button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-            # Book title label
             self.plainTextEdit = QtWidgets.QPlainTextEdit(self.bgwidget)
-            self.plainTextEdit.setGeometry(QtCore.QRect(100 + ((j % 5) * 200), 400 + ((j // 5) * 300), 128, 87))
-            self.plainTextEdit.setStyleSheet("background-color: rgba(0, 0, 0, 0);"
-                                             "color: white;"
-                                             "border: None;"
-                                             "font: 9pt \"MS Shell Dlg 2\";")
             self.plainTextEdit.setObjectName("plain_text_book_" + str(j + 1))
-            self.plainTextEdit.setPlainText(QtCore.QCoreApplication.translate("Dialog", title_list[j]))
-            self.plainTextEdit.setReadOnly(True)
+            t = Thread(target=self.download_thumbnails, args=(j, ))
+            threads.append(t)
         for x in threads:
             x.start()
         for x in threads:
@@ -354,17 +350,32 @@ class SearchScreen(QDialog):
         QApplication.restoreOverrideCursor()
         if search:
             self.search_button.clicked.connect(self.search_function)
+            self.search_line_edit.returnPressed.connect(self.search_function)
         for button in self.bgwidget.findChildren(QtWidgets.QPushButton):
             button.clicked.connect(partial(self.check_clicked))
         menu_button_redirector(self)
 
-    @staticmethod
-    def download_thumbnails(j, label):
+    def download_thumbnails(self, j):
+        label = self.findChild(QtWidgets.QLabel, "label_book_" + str(j + 1))
+        label.setGeometry(QtCore.QRect(100 + ((j % 5) * 200), 210 + ((j // 5) * 300), 128, 190))
+        label.setText('')
         image = QtGui.QImage()
         image.loadFromData(requests.get(thumbnail_list[j]).content)
         label.setPixmap(QtGui.QPixmap(image))
         label.setScaledContents(True)
-        label.setObjectName("label_book_" + str(j + 1))
+        button = self.findChild(QtWidgets.QPushButton, "button_book_" + str(j + 1))
+        button.setGeometry(QtCore.QRect(100 + ((j % 5) * 200), 210 + ((j // 5) * 300), 128, 190))
+        button.setStyleSheet("background-color: rgba(0, 0, 0, 0);")
+        button.setText("")
+        button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        plain_text_edit = self.findChild(QtWidgets.QPlainTextEdit, "plain_text_book_" + str(j + 1))
+        plain_text_edit.setGeometry(QtCore.QRect(100 + ((j % 5) * 200), 400 + ((j // 5) * 300), 128, 87))
+        plain_text_edit.setStyleSheet("background-color: rgba(0, 0, 0, 0);"
+                                         "color: white;"
+                                         "border: None;"
+                                         "font: 9pt \"MS Shell Dlg 2\";")
+        plain_text_edit.setPlainText(QtCore.QCoreApplication.translate("Dialog", title_list[j]))
+        plain_text_edit.setReadOnly(True)
 
     def search_function(self):
         global searchterm
@@ -407,7 +418,6 @@ class ButtonRedirect(QDialog):
         super(ButtonRedirect, self).__init__()
         loadUi(resource_path('assets/ui/expanded-book.ui'), self)
         _translate = QtCore.QCoreApplication.translate
-        # Thumbnail
         self.book_thumbnail = QtWidgets.QLabel(self.bgwidget)
         self.book_thumbnail.setGeometry(QtCore.QRect(70, 70, 320, 475))
         self.book_thumbnail.setText("")
@@ -416,7 +426,6 @@ class ButtonRedirect(QDialog):
         self.book_thumbnail.setPixmap(QtGui.QPixmap(image))
         self.book_thumbnail.setScaledContents(True)
         self.book_thumbnail.setObjectName("book_thumbnail")
-        # Title
         self.book_title = QtWidgets.QPlainTextEdit(self.bgwidget)
         self.book_title.setGeometry(QtCore.QRect(450, 90, 631, 87))
         self.book_title.setStyleSheet("color: #f0f0f0;\n"
@@ -424,7 +433,6 @@ class ButtonRedirect(QDialog):
                                       "background-color: rgba(0, 0, 0, 0);\n"
                                       "border: None;")
         self.book_title.setObjectName("book_title")
-        # Description
         self.book_description = QtWidgets.QPlainTextEdit(self.bgwidget)
         self.book_description.setGeometry(QtCore.QRect(440, 380, 731, 401))
         self.book_description.setStyleSheet("color: #ebebeb;\n"
@@ -432,9 +440,8 @@ class ButtonRedirect(QDialog):
                                             "background-color: rgba(0, 0, 0, 0);\n"
                                             "border: None;")
         self.book_description.setObjectName("book_description")
-        # Comments
         self.Comment_as_label.setText(f'Comment as {username}')
-        try:  # Checks if comments for particular book exist else goes to except
+        try:
             self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 1198, 1100 + (
                     170 * len(bgfns.insertcomment(book_id_list[button_num], False)))))
             self.bgwidget.setGeometry(QtCore.QRect(0, 0, 1198, 1100 + (
@@ -504,8 +511,6 @@ class ButtonRedirect(QDialog):
                         self.ban_button.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         except:
             pass
-
-        # Translation
         self.book_title.setPlainText(_translate("Dialog", title_list[button_num]))
         self.book_title.setReadOnly(True)
         self.book_description.setPlainText(_translate("Dialog", desc_list[button_num]))
@@ -516,7 +521,6 @@ class ButtonRedirect(QDialog):
         self.fav_button.setText(_translate("Dialog", "Add to Favourites"))
         self.my_read_button.setText(_translate("Dialog", "Add to Read books"))
         self.read_list_button.setText(_translate("Dialog", "Add to Read later"))
-        # Button highlight
         button_clicked_style = 'border-radius: 5px;' \
                                'font: 14pt "MS Shell Dlg 2";' \
                                'color: rgb(255, 255, 255);' \
@@ -528,7 +532,6 @@ class ButtonRedirect(QDialog):
             self.my_read_button.setStyleSheet(button_clicked_style)
         if book_id_list[button_num] in bgfns.list_toggle(username, False, '', 'WANTBOOK'):
             self.read_list_button.setStyleSheet(button_clicked_style)
-        # Menu
         menu_button_redirector(self)
         self.fav_button.clicked.connect(lambda: self.change_toggle(button_num, 'LIKEBOOK'))
         self.my_read_button.clicked.connect(lambda: self.change_toggle(button_num, 'READBOOK'))
@@ -568,7 +571,7 @@ class ButtonRedirect(QDialog):
         widget.setCurrentIndex(widget.currentIndex() + 1)
 
     def add_comment(self, num):
-        comment = self.comment_input_text_edit.toPlainText()  # Gets comment from user and stores it into the 'comment' var
+        comment = self.comment_input_text_edit.toPlainText()
         bgfns.insertcomment(book_id_list[num], True, username, comment)
         logging.info(f'New comment posted by {username}')
         widget.addWidget(ButtonRedirect(num))
@@ -607,11 +610,9 @@ def menu_button_redirector(self):
 
 
 def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
-    except Exception:
+    except:
         base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
