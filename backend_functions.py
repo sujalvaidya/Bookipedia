@@ -1,6 +1,6 @@
 import mysql.connector as sqltor
 import pickle as binwriter
-from main import resource_path
+import os
 
 
 def initialise_sql(host, user, password):
@@ -8,7 +8,9 @@ def initialise_sql(host, user, password):
         mycon = sqltor.connect(host=host, user=user, password=password)
     except:
         return False
-    with open(resource_path(r'assets\creds.bin'), 'wb') as f:
+    if not os.path.exists(rf"C:\Users\{os.environ.get('USERNAME')}\Documents\Bookipedia"):
+        os.makedirs(rf"C:\Users\{os.environ.get('USERNAME')}\Documents\Bookipedia")
+    with open(rf"C:\Users\{os.environ.get('USERNAME')}\Documents\Bookipedia\creds.bin", 'wb') as f:
         binwriter.dump({'host': host, 'user': user, 'password': password}, f)
     cur = mycon.cursor()
     cur.execute("DROP DATABASE IF EXISTS BOOKIPEDIA")
@@ -19,19 +21,19 @@ def initialise_sql(host, user, password):
                 "password VARCHAR(20) NOT NULL, "
                 "bancheck BIT(1) DEFAULT b'0');")
     cur.execute('create table regdata('
-                'name varchar(20) not null, '
-                'book varchar(60), '
-                "readbook bit(1) default b'0', "
-                "likebook bit(1) default b'0', "
-                "wantbook bit(1) default b'0', "
-                'comments varchar(200));')
+                'name VARCHAR(20) NOT NULL, '
+                'book VARCHAR(100), '
+                "readbook BIT(1) DEFAULT b'0', "
+                "likebook BIT(1) DEFAULT b'0', "
+                "wantbook BIT(1) DEFAULT b'0', "
+                'comments TEXT);')
     cur.execute('INSERT INTO REGISTRY VALUES("root","pass", 0);')
     mycon.commit()
     return True
 
 
 def connection():
-    with open(resource_path(r'assets\creds.bin'), 'rb') as f:
+    with open(rf"C:\Users\{os.environ.get('USERNAME')}\Documents\Bookipedia\creds.bin", 'rb') as f:
         creds = binwriter.load(f)
     mycon = sqltor.connect(host=creds['host'],
                            user=creds['user'],
